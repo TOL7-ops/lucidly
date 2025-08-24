@@ -1,12 +1,58 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import React, { useState } from 'react';
+import { Navigation } from '@/components/Navigation';
+import { LandingPage } from '@/components/LandingPage';
+import { Dashboard } from '@/components/Dashboard';
+import { NewDreamForm } from '@/components/NewDreamForm';
+
+type ViewType = 'landing' | 'dashboard' | 'new-dream' | 'settings';
 
 const Index = () => {
+  const [currentView, setCurrentView] = useState<ViewType>('landing');
+
+  const handleGetStarted = () => {
+    setCurrentView('dashboard');
+  };
+
+  const handleNewDream = () => {
+    setCurrentView('new-dream');
+  };
+
+  const handleSaveDream = (dream: any) => {
+    console.log('Saving dream:', dream);
+    // In a real app, this would save to a database
+    setCurrentView('dashboard');
+  };
+
+  const handleCancelDream = () => {
+    setCurrentView('dashboard');
+  };
+
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'landing':
+        return <LandingPage onGetStarted={handleGetStarted} />;
+      case 'dashboard':
+        return <Dashboard onNewDream={handleNewDream} />;
+      case 'new-dream':
+        return <NewDreamForm onSave={handleSaveDream} onCancel={handleCancelDream} />;
+      case 'settings':
+        return (
+          <div className="min-h-screen pt-20 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <h1 className="text-4xl font-bold text-cosmic">Settings</h1>
+              <p className="text-muted-foreground">Coming soon...</p>
+            </div>
+          </div>
+        );
+      default:
+        return <LandingPage onGetStarted={handleGetStarted} />;
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen relative">
+      <Navigation currentView={currentView} onViewChange={setCurrentView} />
+      {renderCurrentView()}
     </div>
   );
 };
