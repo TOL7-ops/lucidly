@@ -4,14 +4,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { VoiceRecorder } from '@/components/VoiceRecorder';
 import { Moon, Star, Cloud, Sparkles, Save, X, Plus, Calendar } from 'lucide-react';
 
 interface NewDreamFormProps {
   onSave: (dream: any) => void;
   onCancel: () => void;
+  isPremium?: boolean;
+  onUpgrade?: () => void;
 }
 
-export const NewDreamForm: React.FC<NewDreamFormProps> = ({ onSave, onCancel }) => {
+export const NewDreamForm: React.FC<NewDreamFormProps> = ({ 
+  onSave, 
+  onCancel, 
+  isPremium = false, 
+  onUpgrade 
+}) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mood, setMood] = useState<'lucid' | 'nightmare' | 'peaceful' | 'vivid'>('peaceful');
@@ -153,6 +161,12 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({ onSave, onCancel }) 
                 })}
               </div>
             </div>
+
+            {/* Voice Recording */}
+            <VoiceRecorder 
+              isPremium={isPremium} 
+              onUpgrade={onUpgrade}
+            />
 
             {/* Content */}
             <div className="space-y-2">

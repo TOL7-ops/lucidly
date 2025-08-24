@@ -1,7 +1,8 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Moon, Star, Cloud, Sparkles, BookOpen, Users, Shield } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Moon, Star, Cloud, Sparkles, BookOpen, Users, Shield, Check, Crown, Mic } from 'lucide-react';
 import heroImage from '@/assets/hero-cosmic.jpg';
 import dreamBook from '@/assets/dream-book.jpg';
 
@@ -171,6 +172,114 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                 </Card>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl lg:text-5xl font-bold font-jakarta mb-6">
+              <span className="text-cosmic">Choose Your</span>
+              <br />
+              <span className="text-foreground">Dream Experience</span>
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              Start your journey for free or unlock premium features for advanced dream exploration.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Free Plan */}
+            <Card variant="glass" className="relative">
+              <CardHeader className="text-center pb-8">
+                <CardTitle className="text-2xl font-jakarta mb-2">Free Explorer</CardTitle>
+                <div className="text-4xl font-bold text-cosmic mb-4">$0</div>
+                <p className="text-muted-foreground">Perfect for getting started</p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <ul className="space-y-4">
+                  <li className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <span>Unlimited dream entries</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <span>Basic mood tracking</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <span>Dream tags & search</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <span>Basic dream statistics</span>
+                  </li>
+                </ul>
+                <Button 
+                  variant="glass" 
+                  size="lg" 
+                  className="w-full"
+                  onClick={onGetStarted}
+                >
+                  Start Free
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Premium Plan */}
+            <Card variant="cosmic" className="relative border-primary/50 shadow-cosmic">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                <Badge className="bg-gradient-aurora text-primary-foreground px-4 py-1 font-semibold">
+                  Most Popular
+                </Badge>
+              </div>
+              <CardHeader className="text-center pb-8">
+                <CardTitle className="text-2xl font-jakarta mb-2 text-primary-foreground flex items-center justify-center gap-2">
+                  <Crown className="w-6 h-6 text-amber-400" />
+                  Premium Dreamer
+                </CardTitle>
+                <div className="text-4xl font-bold text-primary-foreground mb-4">$9.99</div>
+                <p className="text-primary-foreground/80">Everything you need for deep dream exploration</p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <ul className="space-y-4">
+                  <li className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                    <span className="text-primary-foreground">Everything in Free</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Mic className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                    <span className="text-primary-foreground font-medium">Voice dream recording</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                    <span className="text-primary-foreground">AI-powered transcription</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                    <span className="text-primary-foreground">AI dream analysis & insights</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                    <span className="text-primary-foreground">Advanced lucid tracking</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                    <span className="text-primary-foreground">Export & backup dreams</span>
+                  </li>
+                </ul>
+                <Button 
+                  variant="glass" 
+                  size="lg" 
+                  className="w-full bg-white/20 text-primary-foreground border-white/30 hover:bg-white/30"
+                >
+                  <Crown className="w-5 h-5" />
+                  Upgrade to Premium
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>

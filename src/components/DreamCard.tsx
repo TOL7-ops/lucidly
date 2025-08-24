@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Moon, Star, Cloud, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Moon, Star, Cloud, Sparkles, Brain, Loader2 } from 'lucide-react';
 
 interface DreamCardProps {
   id: string;
@@ -29,6 +30,17 @@ export const DreamCard: React.FC<DreamCardProps> = ({
   onClick,
 }) => {
   const MoodIcon = moodConfig[mood].icon;
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+
+  const generateSummary = async () => {
+    setIsGeneratingSummary(true);
+    // Simulate AI processing
+    setTimeout(() => {
+      setAiSummary("This dream reflects themes of exploration and freedom. The cosmic imagery suggests a desire for transcendence and spiritual growth. The vivid colors indicate emotional intensity and creativity in your subconscious mind.");
+      setIsGeneratingSummary(false);
+    }, 2000);
+  };
 
   return (
     <Card
@@ -78,6 +90,44 @@ export const DreamCard: React.FC<DreamCardProps> = ({
             )}
           </div>
         )}
+
+        {/* AI Summary Section */}
+        <div className="border-t border-glass-border/30 pt-4 mt-4">
+          {!aiSummary ? (
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                generateSummary();
+              }}
+              disabled={isGeneratingSummary}
+              className="w-full"
+            >
+              {isGeneratingSummary ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating AI Summary...
+                </>
+              ) : (
+                <>
+                  <Brain className="w-4 h-4" />
+                  Generate AI Summary
+                </>
+              )}
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-primary">AI Dream Analysis</span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed bg-primary/5 p-3 rounded-lg border border-primary/10">
+                {aiSummary}
+              </p>
+            </div>
+          )}
+        </div>
       </CardContent>
 
       {/* Shimmer effect on hover */}

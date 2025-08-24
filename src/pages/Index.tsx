@@ -8,6 +8,7 @@ type ViewType = 'landing' | 'dashboard' | 'new-dream' | 'settings';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<ViewType>('landing');
+  const [isPremium, setIsPremium] = useState(false);
 
   const handleGetStarted = () => {
     setCurrentView('dashboard');
@@ -27,6 +28,12 @@ const Index = () => {
     setCurrentView('dashboard');
   };
 
+  const handleUpgrade = () => {
+    // In a real app, this would handle payment processing
+    setIsPremium(true);
+    alert('Welcome to Lucidly Premium! 🎉');
+  };
+
   const renderCurrentView = () => {
     switch (currentView) {
       case 'landing':
@@ -34,7 +41,14 @@ const Index = () => {
       case 'dashboard':
         return <Dashboard onNewDream={handleNewDream} />;
       case 'new-dream':
-        return <NewDreamForm onSave={handleSaveDream} onCancel={handleCancelDream} />;
+        return (
+          <NewDreamForm 
+            onSave={handleSaveDream} 
+            onCancel={handleCancelDream}
+            isPremium={isPremium}
+            onUpgrade={handleUpgrade}
+          />
+        );
       case 'settings':
         return (
           <div className="min-h-screen pt-20 flex items-center justify-center">
