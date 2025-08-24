@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
@@ -212,7 +213,7 @@
   
   /* Dream button variants */
   .btn-dream {
-    @apply glass-card px-8 py-4 font-semibold text-foreground relative overflow-hidden group;
+    @apply glass-card px-8 py-4 font-semibold text-foreground relative overflow-hidden;
     background: var(--gradient-aurora);
     background-size: 200% 200%;
     animation: var(--animation-aurora);
