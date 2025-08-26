@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { DreamCard } from '@/components/DreamCard';
-import { Plus, Search, Filter, Moon, Star, Sparkles, TrendingUp } from 'lucide-react';
+import { useDreams } from '@/hooks/useDreams';
+import { useAuth } from '@/lib/auth-context';
+import { Plus, Search, Filter, Moon, Star, Sparkles, TrendingUp, Loader2 } from 'lucide-react';
 
 interface DashboardProps {
   onNewDream: () => void;
@@ -11,70 +13,40 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNewDream }) => {
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Mock dream data
-  const dreams = [
-    {
-      id: '1',
-      title: 'Flying Through Crystal Caverns',
-      content: 'I found myself soaring through an underground cavern filled with massive, glowing crystals. The walls sparkled with every color imaginable, and I could control my flight with just my thoughts. The crystals hummed with a gentle melody that seemed to guide my path deeper into the earth.',
-      date: 'December 23, 2024',
-      mood: 'lucid' as const,
-      tags: ['flying', 'crystals', 'underground', 'music', 'control']
-    },
-    {
-      id: '2',
-      title: 'Ocean of Stars',
-      content: 'I was swimming in what appeared to be an ocean, but the water was made of liquid starlight. Each stroke through the cosmic sea left trails of golden light behind me. Fish made of constellations swam alongside me, and I felt completely at peace.',
-      date: 'December 22, 2024',
-      mood: 'peaceful' as const,
-      tags: ['ocean', 'stars', 'swimming', 'cosmic', 'peace']
-    },
-    {
-      id: '3',
-      title: 'The Infinite Library',
-      content: 'Endless shelves stretched in every direction, filled with books that seemed to write themselves as I watched. The words on the pages shifted and changed, telling stories I had never heard before. A wise owl perched on my shoulder, whispering secrets of the universe.',
-      date: 'December 21, 2024',
-      mood: 'vivid' as const,
-      tags: ['library', 'books', 'wisdom', 'owl', 'infinite']
-    },
-    {
-      id: '4',
-      title: 'Dancing with Shadows',
-      content: 'In a moonlit ballroom, I danced with shadows that had lives of their own. They moved gracefully across the marble floor, and as we danced, they shared stories of the people they once belonged to. The music seemed to come from the walls themselves.',
-      date: 'December 20, 2024',
-      mood: 'peaceful' as const,
-      tags: ['dancing', 'shadows', 'ballroom', 'moon', 'stories']
-    },
-    {
-      id: '5',
-      title: 'The Clockwork City',
-      content: 'A city made entirely of gears, springs, and clockwork mechanisms. Buildings rotated slowly, streets moved like conveyor belts, and the sky was filled with floating timepieces. I could hear the rhythmic ticking that kept the entire world in motion.',
-      date: 'December 19, 2024',
-      mood: 'vivid' as const,
-      tags: ['clockwork', 'mechanical', 'city', 'time', 'gears']
-    },
-    {
-      id: '6',
-      title: 'Forest of Singing Trees',
-      content: 'Each tree in this magical forest had a voice, creating a harmonious choir that echoed through the misty air. As I walked the winding paths, the trees would lean down to whisper ancient secrets and sing lullabies that made flowers bloom instantly.',
-      date: 'December 18, 2024',
-      mood: 'peaceful' as const,
-      tags: ['forest', 'singing', 'trees', 'music', 'magic']
+  const { isAuthenticated, user } = useAuth();
+  
+  // Use real API if authenticated, otherwise show empty state
+  const dreamsQuery = useDreams();
+  const shouldUseMockData = !isAuthenticated;
+  
+  // Only fetch dreams if authenticated
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      dreamsQuery.refetch();
     }
-  ];
+  }, [isAuthenticated]);
+  
+  const displayDreams = shouldUseMockData ? [] : dreamsQuery.dreams;
+  const isLoading = shouldUseMockData ? false : dreamsQuery.isLoading;
+  const isError = shouldUseMockData ? false : dreamsQuery.isError;
+  const error = shouldUseMockData ? null : dreamsQuery.error;
 
-  const filteredDreams = dreams.filter(dream =>
-    dream.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const filteredDreams = displayDreams.filter((dream: any) =>
+    (dream.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     dream.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    dream.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    (dream.tags || []).some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const stats = {
-    totalDreams: dreams.length,
-    lucidDreams: dreams.filter(d => d.mood === 'lucid').length,
-    thisWeek: 4,
-    avgDuration: '7.5 hrs'
+    totalDreams: displayDreams.length,
+    lucidDreams: displayDreams.filter((d: any) => d.mood === 'lucid').length,
+    thisWeek: displayDreams.filter((d: any) => {
+      const dreamDate = new Date(d.created_at);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return dreamDate >= weekAgo;
+    }).length,
+    avgDuration: '7.5 hrs' // This could be calculated from actual data in the future
   };
 
   return (
@@ -104,6 +76,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNewDream }) => {
           </Button>
         </div>
 
+        {/* Authentication Status */}
+        {isAuthenticated && (
+          <div className="text-center py-4">
+            <p className="text-sm text-muted-foreground">
+              Welcome back! You're logged in as <span className="font-medium">{user?.email}</span>
+            </p>
+          </div>
+        )}
+        
         {/* Stats Cards */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card variant="glass" className="group">
@@ -208,7 +189,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNewDream }) => {
               {filteredDreams.map((dream) => (
                 <DreamCard
                   key={dream.id}
-                  {...dream}
+                  id={dream.id}
+                  title={dream.title || 'Untitled Dream'}
+                  content={dream.content}
+                  date={new Date(dream.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                  mood={dream.mood}
+                  tags={dream.tags || []}
+                  summary={dream.summary}
+                  interpretation={dream.interpretation}
                   onClick={() => console.log('Open dream:', dream.id)}
                 />
               ))}

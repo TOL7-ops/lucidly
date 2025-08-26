@@ -1,19 +1,30 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, Home, Book, Plus, Settings, Search } from 'lucide-react';
+import { Moon, Sun, Home, Book, Plus, Settings, Search, User, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 interface NavigationProps {
-  currentView: 'landing' | 'dashboard' | 'new-dream' | 'settings';
-  onViewChange: (view: 'landing' | 'dashboard' | 'new-dream' | 'settings') => void;
+  currentView: string;
+  onViewChange: (view: string) => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
   const [isDark, setIsDark] = useState(true);
+  const { isAuthenticated, user, signOut } = useAuth();
 
   const toggleTheme = () => {
     setIsDark(!isDark);
     document.documentElement.classList.toggle('light');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      onViewChange('landing');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const navigationItems = [
@@ -62,11 +73,41 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
               })}
             </div>
 
-            {/* Theme toggle and search */}
+            {/* Theme toggle, search, and auth */}
             <div className="flex items-center space-x-2">
               <Button variant="ghost" size="icon" className="hidden sm:flex">
                 <Search className="w-4 h-4" />
               </Button>
+              
+              {/* Auth section */}
+              {isAuthenticated ? (
+                <div className="flex items-center space-x-2">
+                  <div className="hidden lg:flex items-center space-x-2 text-sm text-muted-foreground">
+                    <User className="w-4 h-4" />
+                    <span>{user?.email}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="flex items-center space-x-1"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="hidden lg:inline">Logout</span>
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="cosmic"
+                  size="sm"
+                  onClick={() => onViewChange('login')}
+                  className="flex items-center space-x-1"
+                >
+                  <User className="w-4 h-4" />
+                  <span className="hidden lg:inline">Login</span>
+                </Button>
+              )}
+              
               <Button
                 variant="glass"
                 size="icon"

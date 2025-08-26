@@ -117,7 +117,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
             <div className="relative">
               <div className="glass-card p-8 relative overflow-hidden group">
                 <img 
-                  src={heroImage} 
+                  src={(heroImage as any).src || heroImage} 
                   alt="Cosmic dreamscape" 
                   className="w-full h-96 object-cover rounded-2xl transition-transform duration-700 group-hover:scale-105"
                 />
@@ -127,7 +127,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
               {/* Floating dream book */}
               <div className="absolute -bottom-8 -left-8 w-32 h-32 float-element">
                 <img 
-                  src={dreamBook} 
+                  src={(dreamBook as any).src || dreamBook} 
                   alt="Dream journal" 
                   className="w-full h-full object-cover rounded-full shadow-cosmic"
                 />

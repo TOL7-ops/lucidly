@@ -1,73 +1,173 @@
-# Welcome to your Lovable project
+# Lucidly - Dream Journal & Analysis Platform
 
-## Project info
+A beautiful, AI-powered dream journaling application built with Next.js, React, TypeScript, Tailwind CSS, and shadcn-ui components.
 
-**URL**: https://lovable.dev/projects/54f7ca9b-1d0f-426e-b578-f758ace2b28f
+## ✨ Features
 
-## How can I edit this code?
+- 🎙️ **Voice Recording** - Record your dreams with audio transcription
+- 🤖 **AI Analysis** - Get AI-powered dream summaries, sentiment analysis, and interpretations
+- 📱 **Modern UI** - Beautiful, responsive design with cosmic themes
+- 🔐 **Authentication** - Secure user authentication with Supabase
+- 📊 **Dashboard** - Track your dream patterns and statistics
+- 🌙 **Dream Types** - Categorize dreams by mood (lucid, peaceful, vivid, nightmare)
 
-There are several ways of editing your application.
+## 🚀 Getting Started
 
-**Use Lovable**
+### Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/54f7ca9b-1d0f-426e-b578-f758ace2b28f) and start prompting.
+- Node.js 18+ 
+- npm or yarn
+- Supabase account
+- Hugging Face account (for AI features)
 
-Changes made via Lovable will be committed automatically to this repo.
+### Environment Setup
 
-**Use your preferred IDE**
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd lucidly-dreamscape-design
+   ```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+3. **Set up environment variables**
+   
+   Create a `.env.local` file in the root directory:
+   
+   ```bash
+   # Supabase Configuration
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_URL=your_supabase_project_url
+   SUPABASE_ANON_KEY=your_supabase_anon_key
+   
+   # Hugging Face API Key
+   HF_API_KEY=your_hugging_face_api_token
+   ```
 
-Follow these steps:
+### How to Get Your API Keys
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+#### Supabase Setup
+1. Go to [supabase.com](https://supabase.com)
+2. Create a new project
+3. Go to Settings > API
+4. Copy your Project URL and anon/public key
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+#### Hugging Face Setup
+1. Go to [huggingface.co](https://huggingface.co)
+2. Create an account and sign in
+3. Go to Settings > Access Tokens
+4. Create a new token with "Read" permission
+5. Copy the token
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 4. Run the development server
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Open [http://localhost:8080](http://localhost:8080) in your browser.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🔧 API Endpoints
 
-**Use GitHub Codespaces**
+The application includes the following API endpoints:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- `POST /api/dreams` - Create a new dream entry
+- `GET /api/dreams` - Get all dreams for authenticated user
+- `GET /api/dreams/[id]` - Get a specific dream
+- `PATCH /api/dreams/[id]` - Update dream with AI analysis
+- `DELETE /api/dreams/[id]` - Delete a dream
+- `POST /api/transcribe` - Transcribe audio to text
+- `GET /api/health` - Health check endpoint
 
-## What technologies are used for this project?
+## 🤖 AI Features
 
-This project is built with:
+The app uses Hugging Face models for:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Speech-to-Text**: Audio transcription using Whisper models
+- **Summarization**: Dream content summarization
+- **Sentiment Analysis**: Emotional analysis of dreams
+- **Dream Interpretation**: AI-powered dream meanings
 
-## How can I deploy this project?
+## 🛠️ Tech Stack
 
-Simply open [Lovable](https://lovable.dev/projects/54f7ca9b-1d0f-426e-b578-f758ace2b28f) and click on Share -> Publish.
+- **Frontend**: Next.js, React, TypeScript, Tailwind CSS
+- **UI Components**: shadcn-ui
+- **Backend**: Next.js API Routes
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+- **AI Services**: Hugging Face APIs
+- **Audio Processing**: Web Audio API, FormData
 
-## Can I connect a custom domain to my Lovable project?
+## 📁 Project Structure
 
-Yes, you can!
+```
+├── pages/
+│   ├── api/           # API routes
+│   ├── _app.tsx       # App wrapper
+│   └── index.tsx      # Home page
+├── src/
+│   ├── components/    # React components
+│   ├── hooks/         # Custom React hooks
+│   ├── lib/           # Utility libraries
+│   └── pages/         # Page components
+├── public/            # Static assets
+└── styles/            # Global styles
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🔒 Authentication
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+The app now includes **full Supabase authentication**:
+
+### Features
+- ✅ **Real Login/Signup** - Complete authentication flow with email/password
+- ✅ **Session Persistence** - Users stay logged in across browser refreshes
+- ✅ **Protected Routes** - API routes require valid JWT tokens
+- ✅ **Auto-redirect** - Unauthenticated users are redirected to login
+- ✅ **Logout Functionality** - Clean session termination
+
+### How to Use
+1. Click **"Start Your Journey"** or **"Begin Your Dream Journey"** → redirects to `/login`
+2. Create account or sign in with existing credentials
+3. Access dashboard and record dreams (requires authentication)
+4. Click **Logout** in navigation to sign out
+
+### Setup Requirements
+- Set up Supabase project with authentication enabled
+- Configure your `.env.local` with Supabase credentials
+- Database `dreams` table with RLS policies (users can only access their own dreams)
+
+## 🐛 Troubleshooting
+
+### Transcription Not Working
+- Ensure your `HF_API_KEY` is set correctly in `.env.local`
+- Check the browser console for API errors
+- Verify your Hugging Face token has the correct permissions
+
+### Database Errors
+- Verify your Supabase credentials
+- Check that your database schema is set up correctly
+- Ensure Row Level Security (RLS) policies are configured
+
+### Environment Variables Not Loading
+- Make sure your file is named exactly `.env.local`
+- Restart the development server after adding environment variables
+- Check that there are no syntax errors in your `.env.local` file
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+---
+
+**Happy dreaming! 🌙✨**

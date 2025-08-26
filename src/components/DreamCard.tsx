@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { dreamsApi } from '@/lib/api';
 import { Moon, Star, Cloud, Sparkles, Brain, Loader2 } from 'lucide-react';
 
 interface DreamCardProps {
@@ -11,6 +12,8 @@ interface DreamCardProps {
   date: string;
   mood?: 'lucid' | 'nightmare' | 'peaceful' | 'vivid';
   tags?: string[];
+  summary?: string;
+  interpretation?: string;
   onClick?: () => void;
 }
 
@@ -22,24 +25,55 @@ const moodConfig = {
 };
 
 export const DreamCard: React.FC<DreamCardProps> = ({
+  id,
   title,
   content,
   date,
   mood = 'peaceful',
   tags = [],
+  summary,
+  interpretation,
   onClick,
 }) => {
   const MoodIcon = moodConfig[mood].icon;
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(summary || interpretation || null);
+  const [loading, setLoading] = useState(false);
 
-  const generateSummary = async () => {
-    setIsGeneratingSummary(true);
-    // Simulate AI processing
-    setTimeout(() => {
-      setAiSummary("This dream reflects themes of exploration and freedom. The cosmic imagery suggests a desire for transcendence and spiritual growth. The vivid colors indicate emotional intensity and creativity in your subconscious mind.");
-      setIsGeneratingSummary(false);
-    }, 2000);
+  const handleSummarize = async () => {
+    setLoading(true);
+    try {
+      console.log('Starting summary generation for dream:', id);
+      console.log('Dream content:', content);
+      
+      // Single API call that generates and saves the summary
+      const requestBody = { text: content, dreamId: id };
+      console.log('Sending request to /api/summary:', requestBody);
+      
+      const response = await fetch("/api/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (data.success && data.summary) {
+        console.log('Summary generated and saved successfully');
+        setAiSummary(data.summary); // Update UI immediately
+      } else {
+        console.error('Failed to generate summary:', data);
+        alert("Failed to generate summary.");
+      }
+    } catch (err) {
+      console.error("Summary error:", err);
+      alert("Error generating summary.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -95,16 +129,20 @@ export const DreamCard: React.FC<DreamCardProps> = ({
         <div className="border-t border-glass-border/30 pt-4 mt-4">
           {!aiSummary ? (
             <Button
+              type="button"
               variant="glass"
               size="sm"
               onClick={(e) => {
+                console.log('Button clicked, preventing default behavior');
+                e.preventDefault();
                 e.stopPropagation();
-                generateSummary();
+                console.log('Calling handleSummarize...');
+                handleSummarize();
               }}
-              disabled={isGeneratingSummary}
+              disabled={loading}
               className="w-full"
             >
-              {isGeneratingSummary ? (
+              {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Generating AI Summary...

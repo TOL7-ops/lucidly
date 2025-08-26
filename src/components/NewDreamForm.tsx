@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { VoiceRecorder } from '@/components/VoiceRecorder';
-import { Moon, Star, Cloud, Sparkles, Save, X, Plus, Calendar } from 'lucide-react';
+import { useCreateDream } from '@/hooks/useDreams';
+import { Moon, Star, Cloud, Sparkles, Save, X, Plus, Calendar, Loader2 } from 'lucide-react';
 
 interface NewDreamFormProps {
-  onSave: (dream: any) => void;
+  onSave: () => void; // Just notify parent that save is complete
   onCancel: () => void;
   isPremium?: boolean;
   onUpgrade?: () => void;
@@ -22,9 +23,13 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [transcript, setTranscript] = useState('');
   const [mood, setMood] = useState<'lucid' | 'nightmare' | 'peaceful' | 'vivid'>('peaceful');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  
+  // Hook for creating dreams
+  const createDreamMutation = useCreateDream();
 
   const moodOptions = [
     { value: 'lucid', label: 'Lucid', icon: Sparkles, color: 'text-accent bg-accent/10' },
@@ -44,19 +49,32 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  const handleSave = () => {
-    if (title.trim() && content.trim()) {
-      onSave({
-        title: title.trim(),
-        content: content.trim(),
-        mood,
-        tags,
-        date: new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })
+  const handleSave = async () => {
+    const dreamContent = content.trim() || transcript.trim();
+    
+    if (!dreamContent) {
+      return;
+    }
+
+    try {
+      await createDreamMutation.mutateAsync({
+        content: dreamContent,
+        transcript: transcript.trim() || undefined
       });
+      
+      // Reset form
+      setTitle('');
+      setContent('');
+      setTranscript('');
+      setMood('peaceful');
+      setTags([]);
+      setNewTag('');
+      
+      // Notify parent
+      onSave();
+    } catch (error) {
+      console.error('Failed to save dream:', error);
+      // Error is handled by the mutation hook with toast
     }
   };
 
@@ -90,10 +108,19 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({
             <Button 
               variant="cosmic" 
               onClick={handleSave}
-              disabled={!title.trim() || !content.trim()}
+              disabled={(!content.trim() && !transcript.trim()) || createDreamMutation.isPending}
             >
-              <Save className="w-4 h-4" />
-              Save Dream
+              {createDreamMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Save Dream
+                </>
+              )}
             </Button>
           </div>
         </div>

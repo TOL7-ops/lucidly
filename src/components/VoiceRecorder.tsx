@@ -2,16 +2,19 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Mic, MicOff, Play, Pause, Square, Crown } from 'lucide-react';
+import { useTranscription } from '@/hooks/useDreams';
+import { Mic, MicOff, Play, Pause, Square, Crown, Loader2 } from 'lucide-react';
 
 interface VoiceRecorderProps {
   isPremium?: boolean;
   onUpgrade?: () => void;
+  onTranscriptChange?: (transcript: string) => void;
 }
 
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ 
   isPremium = false, 
-  onUpgrade 
+  onUpgrade,
+  onTranscriptChange
 }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -21,6 +24,9 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  
+  // Hook for transcription API
+  const transcriptionMutation = useTranscription();
 
   const startRecording = async () => {
     if (!isPremium) {
@@ -29,8 +35,24 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
+      
+      // Use webm format if supported, otherwise fallback to default
+      let options = {};
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        options = { mimeType: 'audio/webm;codecs=opus' };
+      } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+        options = { mimeType: 'audio/wav' };
+      }
+      
+      mediaRecorderRef.current = new MediaRecorder(stream, options);
       chunksRef.current = [];
 
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -39,14 +61,22 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         }
       };
 
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/wav' });
+      mediaRecorderRef.current.onstop = async () => {
+        // Use the same MIME type for the blob as the recorder
+        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/wav';
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         setAudioBlob(blob);
         
-        // Mock transcript generation
-        setTimeout(() => {
-          setTranscript("I had this incredible dream where I was floating through a cosmic landscape filled with stars and nebulas. The colors were so vivid - deep purples and blues swirling around me. I felt completely weightless and free, like I was swimming through space itself...");
-        }, 1000);
+        // Transcribe the audio using the real API
+        try {
+          const transcribedText = await transcriptionMutation.mutateAsync(blob);
+          setTranscript(transcribedText);
+          onTranscriptChange?.(transcribedText);
+        } catch (error) {
+          console.error('Transcription failed:', error);
+          // Fallback to manual entry
+          setTranscript('');
+        }
       };
 
       mediaRecorderRef.current.start();
@@ -92,9 +122,16 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     setAudioBlob(null);
     setTranscript('');
     setIsPlaying(false);
+    onTranscriptChange?.('');
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
+  };
+
+  const handleTranscriptChange = (value: string) => {
+    setTranscript(value);
+    onTranscriptChange?.(value);
   };
 
   if (!isPremium) {
@@ -193,14 +230,24 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         )}
 
         {/* Transcript */}
-        {transcript && (
+        {(transcript || transcriptionMutation.isPending) && (
           <div className="space-y-2">
-            <label className="text-sm font-medium">AI Transcript</label>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">AI Transcript</label>
+              {transcriptionMutation.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              )}
+            </div>
             <Textarea
               value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
+              onChange={(e) => handleTranscriptChange(e.target.value)}
               className="glass border-glass-border/50 bg-glass-bg/50 min-h-[120px]"
-              placeholder="Your voice will be transcribed here..."
+              placeholder={
+                transcriptionMutation.isPending 
+                  ? "Transcribing your recording..." 
+                  : "Your voice will be transcribed here..."
+              }
+              disabled={transcriptionMutation.isPending}
             />
             <p className="text-xs text-muted-foreground">
               ✨ AI-generated transcript. You can edit it above.
