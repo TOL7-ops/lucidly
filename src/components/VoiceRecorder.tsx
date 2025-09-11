@@ -9,12 +9,14 @@ interface VoiceRecorderProps {
   isPremium?: boolean;
   onUpgrade?: () => void;
   onTranscriptChange?: (transcript: string) => void;
+  onAudioReady?: (blob: Blob) => void;
 }
 
-export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ 
-  isPremium = false, 
+export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
+  isPremium = false,
   onUpgrade,
-  onTranscriptChange
+  onTranscriptChange,
+  onAudioReady,
 }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -40,16 +42,16 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
           sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
-          noiseSuppression: true
-        }
+          noiseSuppression: true,
+        },
       });
       
-      // Use webm format if supported, otherwise fallback to default
-      let options = {};
-      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-        options = { mimeType: 'audio/webm;codecs=opus' };
-      } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+      // Prefer WAV for better server compatibility, then fall back to WEBM(OPUS)
+      let options: MediaRecorderOptions = {};
+      if (MediaRecorder.isTypeSupported('audio/wav')) {
         options = { mimeType: 'audio/wav' };
+      } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        options = { mimeType: 'audio/webm;codecs=opus' };
       }
       
       mediaRecorderRef.current = new MediaRecorder(stream, options);
@@ -62,11 +64,24 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        // Use the same MIME type for the blob as the recorder
-        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/wav';
-        const blob = new Blob(chunksRef.current, { type: mimeType });
+        // Use the same MIME type for the blob as the recorder, but normalize to a known-good type
+        const recorderType = mediaRecorderRef.current?.mimeType || 'audio/wav';
+        const normalizedType =
+          recorderType.includes('wav') ? 'audio/wav' :
+          recorderType.includes('mpeg') ? 'audio/mpeg' :
+          recorderType.includes('mp3') ? 'audio/mpeg' :
+          recorderType.includes('webm') ? 'audio/webm' :
+          'audio/wav';
+
+        const blob = new Blob(chunksRef.current, { type: normalizedType });
         setAudioBlob(blob);
-        
+        // Expose the recorded blob to parent so it can decide when to upload (on Save)
+        try {
+          onAudioReady?.(blob);
+        } catch (e) {
+          console.warn('onAudioReady callback threw:', e);
+        }
+
         // Transcribe the audio using the real API
         try {
           const transcribedText = await transcriptionMutation.mutateAsync(blob);
@@ -244,8 +259,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               className="glass border-glass-border/50 bg-glass-bg/50 min-h-[120px]"
               placeholder={
                 transcriptionMutation.isPending 
-                  ? "Transcribing your recording..." 
-                  : "Your voice will be transcribed here..."
+                  ? 'Transcribing your recording...' 
+                  : 'Your voice will be transcribed here...'
               }
               disabled={transcriptionMutation.isPending}
             />

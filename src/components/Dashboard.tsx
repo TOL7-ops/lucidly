@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { DreamCard } from '@/components/DreamCard';
 import { useDreams } from '@/hooks/useDreams';
 import { useAuth } from '@/lib/auth-context';
+import { dreamsApi, extractTitle } from '@/lib/api';
 import { Plus, Search, Filter, Moon, Star, Sparkles, TrendingUp, Loader2 } from 'lucide-react';
 
 interface DashboardProps {
@@ -34,7 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNewDream }) => {
   const filteredDreams = displayDreams.filter((dream: any) =>
     (dream.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     dream.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (dream.tags || []).some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    (dream.tags || []).some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   const stats = {
@@ -46,7 +48,102 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNewDream }) => {
       weekAgo.setDate(weekAgo.getDate() - 7);
       return dreamDate >= weekAgo;
     }).length,
-    avgDuration: '7.5 hrs' // This could be calculated from actual data in the future
+    avgDuration: '7.5 hrs', // This could be calculated from actual data in the future
+  };
+
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportAll = async () => {
+    try {
+      setExporting(true);
+      const [{ jsPDF }, res] = await Promise.all([
+        import('jspdf'),
+        dreamsApi.getDreams(),
+      ]);
+      if (!res.success || !res.data) {
+        throw new Error(res.error || 'Failed to fetch dreams');
+      }
+      const dreams = res.data;
+
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+      const margin = 40;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('Dream Journal', margin, y);
+      y += 24;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Exported: ${new Date().toLocaleString()}`, margin, y);
+      y += 20;
+
+      const ensureSpace = (needed = 20) => {
+        if (y + needed > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+      };
+
+      const addBlock = (heading: string, text?: string | null) => {
+        if (!text) return;
+        ensureSpace(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(heading, margin, y);
+        y += 14;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        const lines = doc.splitTextToSize(text, contentWidth);
+        lines.forEach((line: string) => {
+          ensureSpace(14);
+          doc.text(line, margin, y);
+          y += 14;
+        });
+        y += 8;
+      };
+
+      dreams.forEach((d, idx) => {
+        const title = d.title || extractTitle(d.content || '') || 'Untitled Dream';
+        const date = new Date(d.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const sentiment = d.sentiment?.label
+          ? `${d.sentiment.label}${d.sentiment.score ? ` (${(d.sentiment.score * 100).toFixed(1)}%)` : ''}`
+          : '';
+
+        ensureSpace(30);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text(title, margin, y);
+        y += 18;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        const meta = sentiment ? `${date} • ${sentiment}` : date;
+        doc.text(meta, margin, y);
+        y += 16;
+
+        addBlock('Content', d.content || '');
+        if (d.transcript) addBlock('Transcript', d.transcript);
+
+        if (idx < dreams.length - 1) {
+          ensureSpace(16);
+          doc.setDrawColor(220);
+          doc.line(margin, y, pageWidth - margin, y);
+          y += 16;
+        }
+      });
+
+      doc.save('dream_journal.pdf');
+    } catch (e) {
+      console.error('Export All failed:', e);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -168,6 +265,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNewDream }) => {
               Recent Dreams
               <span className="text-muted-foreground ml-2">({filteredDreams.length})</span>
             </h2>
+            <Button variant="glass" onClick={handleExportAll} disabled={exporting}>
+              {exporting ? 'Exporting…' : 'Export All'}
+            </Button>
           </div>
 
           {filteredDreams.length === 0 ? (
@@ -187,22 +287,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNewDream }) => {
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredDreams.map((dream) => (
-                <DreamCard
-                  key={dream.id}
-                  id={dream.id}
-                  title={dream.title || 'Untitled Dream'}
-                  content={dream.content}
-                  date={new Date(dream.created_at).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                  mood={dream.mood}
-                  tags={dream.tags || []}
-                  summary={dream.summary}
-                  interpretation={dream.interpretation}
-                  onClick={() => console.log('Open dream:', dream.id)}
-                />
+                <Link href={`/dreams/${dream.id}`} key={dream.id} className="block">
+                  <DreamCard
+                    id={dream.id}
+                    title={dream.title || 'Untitled Dream'}
+                    content={dream.content}
+                    date={new Date(dream.created_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                    mood={dream.mood}
+                    tags={dream.tags || []}
+                    summary={dream.summary}
+                    interpretation={dream.interpretation}
+                  />
+                </Link>
               ))}
             </div>
           )}

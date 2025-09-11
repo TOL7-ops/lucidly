@@ -5,6 +5,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   
   res.status(200).json({
     message: 'Simple test endpoint working',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 } 

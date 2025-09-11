@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Moon, Stars, Sparkles } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function Login() {
   const router = useRouter();
@@ -18,13 +18,13 @@ export default function Login() {
   // Form states
   const [loginData, setLoginData] = useState({
     email: '',
-    password: ''
+    password: '',
   });
   
   const [signupData, setSignupData] = useState({
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
 
   // Check if already logged in

@@ -14,6 +14,8 @@ interface DreamCardProps {
   tags?: string[];
   summary?: string;
   interpretation?: string;
+  /** Public URL to the saved audio (if any) */
+  audioUrl?: string;
   onClick?: () => void;
 }
 
@@ -33,6 +35,7 @@ export const DreamCard: React.FC<DreamCardProps> = ({
   tags = [],
   summary,
   interpretation,
+  audioUrl,
   onClick,
 }) => {
   const MoodIcon = moodConfig[mood].icon;
@@ -49,9 +52,9 @@ export const DreamCard: React.FC<DreamCardProps> = ({
       const requestBody = { text: content, dreamId: id };
       console.log('Sending request to /api/summary:', requestBody);
       
-      const response = await fetch("/api/summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
       });
       
@@ -66,11 +69,11 @@ export const DreamCard: React.FC<DreamCardProps> = ({
         setAiSummary(data.summary); // Update UI immediately
       } else {
         console.error('Failed to generate summary:', data);
-        alert("Failed to generate summary.");
+        alert('Failed to generate summary.');
       }
     } catch (err) {
-      console.error("Summary error:", err);
-      alert("Error generating summary.");
+      console.error('Summary error:', err);
+      alert('Error generating summary.');
     } finally {
       setLoading(false);
     }
@@ -122,6 +125,15 @@ export const DreamCard: React.FC<DreamCardProps> = ({
                 +{tags.length - 3}
               </Badge>
             )}
+          </div>
+        )}
+
+        {/* Audio Player */}
+        {audioUrl && (
+          <div className="pt-2">
+            <audio controls src={audioUrl} className="w-full">
+              Your browser does not support the audio element.
+            </audio>
           </div>
         )}
 

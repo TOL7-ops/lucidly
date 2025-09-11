@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { VoiceRecorder } from '@/components/VoiceRecorder';
 import { useCreateDream } from '@/hooks/useDreams';
 import { Moon, Star, Cloud, Sparkles, Save, X, Plus, Calendar, Loader2 } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
+import { uploadAudioToSupabase } from '@/lib/uploadAudio';
 
 interface NewDreamFormProps {
   onSave: () => void; // Just notify parent that save is complete
@@ -19,7 +21,7 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({
   onSave, 
   onCancel, 
   isPremium = false, 
-  onUpgrade 
+  onUpgrade, 
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -27,7 +29,11 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({
   const [mood, setMood] = useState<'lucid' | 'nightmare' | 'peaceful' | 'vivid'>('peaceful');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   
+  // Auth (needed for audio upload)
+  const { isAuthenticated, user } = useAuth();
+
   // Hook for creating dreams
   const createDreamMutation = useCreateDream();
 
@@ -57,9 +63,35 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({
     }
 
     try {
+      // Optionally upload audio on save (only if authenticated and we have a recording)
+      let audioUrl: string | undefined;
+      let audioPath: string | undefined;
+
+      if (audioBlob && isAuthenticated && user?.id) {
+        try {
+          const result = await uploadAudioToSupabase({
+            userId: user.id,
+            file: audioBlob,
+          });
+          if (result.success) {
+            audioUrl = result.publicUrl;
+            audioPath = result.filePath;
+            console.log('Audio uploaded:', { audioUrl, audioPath });
+          } else {
+            console.warn('Audio upload failed:', result.error);
+          }
+        } catch (e) {
+          console.warn('Audio upload threw error:', e);
+        }
+      }
+
       await createDreamMutation.mutateAsync({
+        title: title.trim() || undefined,
         content: dreamContent,
-        transcript: transcript.trim() || undefined
+        transcript: transcript.trim() || undefined,
+        tags: tags.length > 0 ? tags : undefined,
+        audioUrl,
+        audioPath,
       });
       
       // Reset form
@@ -69,6 +101,7 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({
       setMood('peaceful');
       setTags([]);
       setNewTag('');
+      setAudioBlob(null);
       
       // Notify parent
       onSave();
@@ -156,7 +189,7 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({
                   weekday: 'long',
                   year: 'numeric',
                   month: 'long',
-                  day: 'numeric'
+                  day: 'numeric',
                 })}
               </span>
             </div>
@@ -190,9 +223,14 @@ export const NewDreamForm: React.FC<NewDreamFormProps> = ({
             </div>
 
             {/* Voice Recording */}
-            <VoiceRecorder 
-              isPremium={isPremium} 
+            <VoiceRecorder
+              isPremium={isPremium}
               onUpgrade={onUpgrade}
+              onAudioReady={(blob) => {
+                console.log('Audio ready, storing temporarily in form state. Size:', blob.size, 'type:', blob.type);
+                setAudioBlob(blob);
+              }}
+              onTranscriptChange={(text) => setTranscript(text)}
             />
 
             {/* Content */}

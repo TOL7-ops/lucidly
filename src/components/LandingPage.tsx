@@ -14,34 +14,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
   const features = [
     {
       icon: BookOpen,
-      title: "Dream Journal",
-      description: "Capture your dreams with our intuitive and beautiful interface designed for reflection."
+      title: 'Dream Journal',
+      description: 'Capture your dreams with our intuitive and beautiful interface designed for reflection.',
     },
     {
       icon: Sparkles,
-      title: "Lucid Tracking",
-      description: "Track your lucid dreaming progress and discover patterns in your dream consciousness."
+      title: 'Lucid Tracking',
+      description: 'Track your lucid dreaming progress and discover patterns in your dream consciousness.',
     },
     {
       icon: Moon,
-      title: "Sleep Insights",
-      description: "Understand your sleep patterns and how they affect your dreaming experience."
+      title: 'Sleep Insights',
+      description: 'Understand your sleep patterns and how they affect your dreaming experience.',
     },
     {
       icon: Users,
-      title: "Dream Community",
-      description: "Connect with fellow dreamers and share your extraordinary nocturnal adventures."
+      title: 'Dream Community',
+      description: 'Connect with fellow dreamers and share your extraordinary nocturnal adventures.',
     },
     {
       icon: Shield,
-      title: "Private & Secure",
-      description: "Your dreams are personal. We ensure your journal remains completely private and secure."
+      title: 'Private & Secure',
+      description: 'Your dreams are personal. We ensure your journal remains completely private and secure.',
     },
     {
       icon: Star,
-      title: "Dream Analysis",
-      description: "Get insights into your dreams with AI-powered analysis and interpretation tools."
-    }
+      title: 'Dream Analysis',
+      description: 'Get insights into your dreams with AI-powered analysis and interpretation tools.',
+    },
   ];
 
   return (

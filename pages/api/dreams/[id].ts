@@ -1,69 +1,71 @@
-import { NextApiResponse } from 'next'
-import { withAuth, AuthenticatedRequest, apiResponse } from '../../../src/lib/auth'
-import { summarizeText, analyzeSentiment, interpretDream } from '../../../src/lib/huggingface'
+import { NextApiResponse } from 'next';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { withAuth, AuthenticatedRequest, apiResponse } from '../../../src/lib/auth';
+import { summarizeText, analyzeSentiment, interpretDream } from '../../../src/lib/huggingface';
+import type { Dream } from '../../../src/lib/supabaseClient';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
-  const { method, query } = req
-  const { supabase, user } = req
-  const dreamId = query.id as string
+  const { method, query } = req;
+  const { supabase, user } = req;
+  const dreamId = query.id as string;
 
   if (!dreamId) {
-    return apiResponse(res, 400, null, 'Dream ID is required')
+    return apiResponse(res, 400, null, 'Dream ID is required');
   }
 
   switch (method) {
     case 'GET':
-      return handleGetDream(req, res, supabase, user, dreamId)
+      return handleGetDream(req, res, supabase, user, dreamId);
     case 'PUT':
-      return handlePutDream(req, res, supabase, user, dreamId)
+      return handlePutDream(req, res, supabase, user, dreamId);
     case 'PATCH':
-      return handleUpdateDream(req, res, supabase, user, dreamId)
+      return handleUpdateDream(req, res, supabase, user, dreamId);
     case 'DELETE':
-      return handleDeleteDream(req, res, supabase, user, dreamId)
+      return handleDeleteDream(req, res, supabase, user, dreamId);
     default:
-      res.setHeader('Allow', ['GET', 'PUT', 'PATCH', 'DELETE'])
-      return apiResponse(res, 405, null, `Method ${method} Not Allowed`)
+      res.setHeader('Allow', ['GET', 'PUT', 'PATCH', 'DELETE']);
+      return apiResponse(res, 405, null, `Method ${method} Not Allowed`);
   }
 }
 
 async function handleGetDream(
   req: AuthenticatedRequest,
   res: NextApiResponse,
-  supabase: any,
+  supabase: SupabaseClient,
   user: { id: string },
-  dreamId: string
+  dreamId: string,
 ) {
   try {
     const { data: dream, error } = await supabase
       .from('dreams')
       .select('*')
       .eq('id', dreamId)
-      .single()
+      .single();
 
     if (error) {
-      console.error('Database error:', error)
-      return apiResponse(res, 404, null, 'Dream not found')
+      console.error('Database error:', error);
+      return apiResponse(res, 404, null, 'Dream not found');
     }
 
-    return apiResponse(res, 200, dream)
+    return apiResponse(res, 200, dream);
   } catch (error) {
-    console.error('Get dream error:', error)
-    return apiResponse(res, 500, null, 'Internal server error')
+    console.error('Get dream error:', error);
+    return apiResponse(res, 500, null, 'Internal server error');
   }
 }
 
 async function handlePutDream(
   req: AuthenticatedRequest,
   res: NextApiResponse,
-  supabase: any,
+  supabase: SupabaseClient,
   user: { id: string },
-  dreamId: string
+  dreamId: string,
 ) {
   try {
-    const { summary } = req.body
+    const { summary } = req.body;
 
     if (!summary) {
-      return apiResponse(res, 400, null, 'Summary is required')
+      return apiResponse(res, 400, null, 'Summary is required');
     }
 
     // Update the dream with the new summary
@@ -72,73 +74,73 @@ async function handlePutDream(
       .update({ summary })
       .eq('id', dreamId)
       .select()
-      .single()
+      .single();
 
     if (updateError) {
-      console.error('Update error:', updateError)
-      return apiResponse(res, 500, null, 'Failed to update dream')
+      console.error('Update error:', updateError);
+      return apiResponse(res, 500, null, 'Failed to update dream');
     }
 
-    return apiResponse(res, 200, updatedDream)
+    return apiResponse(res, 200, updatedDream);
   } catch (error) {
-    console.error('Put dream error:', error)
-    return apiResponse(res, 500, null, 'Internal server error')
+    console.error('Put dream error:', error);
+    return apiResponse(res, 500, null, 'Internal server error');
   }
 }
 
 async function handleUpdateDream(
   req: AuthenticatedRequest,
   res: NextApiResponse,
-  supabase: any,
+  supabase: SupabaseClient,
   user: { id: string },
-  dreamId: string
+  dreamId: string,
 ) {
   try {
-    const { generateSummary, generateSentiment, generateInterpretation } = req.body
+    const { generateSummary, generateSentiment, generateInterpretation } = req.body;
 
     // First, get the current dream
     const { data: currentDream, error: fetchError } = await supabase
       .from('dreams')
       .select('*')
       .eq('id', dreamId)
-      .single()
+      .single();
 
     if (fetchError) {
-      console.error('Database error:', fetchError)
-      return apiResponse(res, 404, null, 'Dream not found')
+      console.error('Database error:', fetchError);
+      return apiResponse(res, 404, null, 'Dream not found');
     }
 
-    const updates: any = {}
-    const dreamText = currentDream.content || currentDream.transcript || ''
+    const updates: Partial<Pick<Dream, 'summary' | 'sentiment' | 'interpretation'>> = {};
+    const dreamText = currentDream.content || currentDream.transcript || '';
 
     if (!dreamText) {
-      return apiResponse(res, 400, null, 'No content available for processing')
+      return apiResponse(res, 400, null, 'No content available for processing');
     }
 
     // Generate summary if requested
     if (generateSummary && !currentDream.summary) {
       try {
-        updates.summary = await summarizeText(dreamText)
+        updates.summary = await summarizeText(dreamText);
       } catch (error) {
-        console.error('Summary generation failed:', error)
+        console.error('Summary generation failed:', error);
       }
     }
 
     // Generate sentiment analysis if requested
     if (generateSentiment && !currentDream.sentiment) {
       try {
-        updates.sentiment = await analyzeSentiment(dreamText)
+        updates.sentiment = await analyzeSentiment(dreamText);
       } catch (error) {
-        console.error('Sentiment analysis failed:', error)
+        console.error('Sentiment analysis failed:', error);
       }
     }
 
     // Generate interpretation if requested
     if (generateInterpretation && !currentDream.interpretation) {
       try {
-        updates.interpretation = await interpretDream(dreamText)
+        updates.interpretation = await interpretDream(dreamText);
       } catch (error) {
-        console.error('Dream interpretation failed:', error)
+        console.error('Dream interpretation failed:', error);
       }
     }
 
@@ -149,46 +151,46 @@ async function handleUpdateDream(
         .update(updates)
         .eq('id', dreamId)
         .select()
-        .single()
+        .single();
 
       if (updateError) {
-        console.error('Update error:', updateError)
-        return apiResponse(res, 500, null, 'Failed to update dream')
+        console.error('Update error:', updateError);
+        return apiResponse(res, 500, null, 'Failed to update dream');
       }
 
-      return apiResponse(res, 200, updatedDream)
+      return apiResponse(res, 200, updatedDream);
     }
 
-    return apiResponse(res, 200, currentDream)
+    return apiResponse(res, 200, currentDream);
   } catch (error) {
-    console.error('Update dream error:', error)
-    return apiResponse(res, 500, null, 'Internal server error')
+    console.error('Update dream error:', error);
+    return apiResponse(res, 500, null, 'Internal server error');
   }
 }
 
 async function handleDeleteDream(
   req: AuthenticatedRequest,
   res: NextApiResponse,
-  supabase: any,
+  supabase: SupabaseClient,
   user: { id: string },
-  dreamId: string
+  dreamId: string,
 ) {
   try {
     const { error } = await supabase
       .from('dreams')
       .delete()
-      .eq('id', dreamId)
+      .eq('id', dreamId);
 
     if (error) {
-      console.error('Database error:', error)
-      return apiResponse(res, 500, null, 'Failed to delete dream')
+      console.error('Database error:', error);
+      return apiResponse(res, 500, null, 'Failed to delete dream');
     }
 
-    return apiResponse(res, 200, { message: 'Dream deleted successfully' })
+    return apiResponse(res, 200, { message: 'Dream deleted successfully' });
   } catch (error) {
-    console.error('Delete dream error:', error)
-    return apiResponse(res, 500, null, 'Internal server error')
+    console.error('Delete dream error:', error);
+    return apiResponse(res, 500, null, 'Internal server error');
   }
 }
 
-export default withAuth(handler) 
+export default withAuth(handler); 

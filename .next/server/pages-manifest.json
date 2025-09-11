@@ -2,6 +2,9 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/": "pages/index.js",
-  "/app": "pages/app.js"
+  "/app": "pages/app.js",
+  "/login": "pages/login.js",
+  "/api/dreams/[id]": "pages/api/dreams/[id].js",
+  "/api/dreams": "pages/api/dreams.js",
+  "/dreams/[id]": "pages/dreams/[id].js"
 }

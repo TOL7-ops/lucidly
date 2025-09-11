@@ -1,5 +1,5 @@
-import App from '../src/App'
+import Index from '../src/pages/Index';
 
 export default function AppPage() {
-  return <App />
-} 
+  return <Index />;
+}

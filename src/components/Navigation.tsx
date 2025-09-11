@@ -58,12 +58,12 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
                 return (
                   <Button
                     key={item.id}
-                    variant={isActive ? "cosmic" : "ghost"}
+                    variant={isActive ? 'cosmic' : 'ghost'}
                     size="sm"
                     onClick={() => onViewChange(item.id as any)}
                     className={cn(
-                      "relative",
-                      isActive && "shadow-glow"
+                      'relative',
+                      isActive && 'shadow-glow',
                     )}
                   >
                     <Icon className="w-4 h-4" />
@@ -115,12 +115,12 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
                 className="relative overflow-hidden"
               >
                 <Sun className={cn(
-                  "w-4 h-4 transition-all duration-300",
-                  isDark ? "rotate-90 scale-0" : "rotate-0 scale-100"
+                  'w-4 h-4 transition-all duration-300',
+                  isDark ? 'rotate-90 scale-0' : 'rotate-0 scale-100',
                 )} />
                 <Moon className={cn(
-                  "absolute w-4 h-4 transition-all duration-300",
-                  isDark ? "rotate-0 scale-100" : "-rotate-90 scale-0"
+                  'absolute w-4 h-4 transition-all duration-300',
+                  isDark ? 'rotate-0 scale-100' : '-rotate-90 scale-0',
                 )} />
               </Button>
             </div>
@@ -138,12 +138,12 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
               return (
                 <Button
                   key={item.id}
-                  variant={isActive ? "cosmic" : "ghost"}
+                  variant={isActive ? 'cosmic' : 'ghost'}
                   size="sm"
                   onClick={() => onViewChange(item.id as any)}
                   className={cn(
-                    "flex-col h-auto py-2 px-3 gap-1",
-                    isActive && "shadow-glow"
+                    'flex-col h-auto py-2 px-3 gap-1',
+                    isActive && 'shadow-glow',
                   )}
                 >
                   <Icon className="w-5 h-5" />

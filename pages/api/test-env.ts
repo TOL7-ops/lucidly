@@ -9,6 +9,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   res.status(200).json({
     hfKeyExists: !!hfKey,
     hfKeyLength: hfKey ? hfKey.length : 0,
-    envKeys: Object.keys(process.env).filter(key => key.includes('HF_'))
+    envKeys: Object.keys(process.env).filter(key => key.includes('HF_')),
   });
 } 

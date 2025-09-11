@@ -1,49 +1,36 @@
 // pages/api/summary.ts
-import type { NextApiRequest, NextApiResponse } from "next";
-import { apiResponse } from '../../src/lib/auth';
+import type { NextApiResponse } from 'next';
+import { withAuth, type AuthenticatedRequest, apiResponse } from '../../src/lib/auth';
 
-const HF_API_BASE = "https://api-inference.huggingface.co/models";
+const HF_API_BASE = 'https://api-inference.huggingface.co/models';
+const modelsToTry = ['facebook/bart-large-cnn', 'sshleifer/distilbart-cnn-12-6'];
 
-const modelsToTry = [
-  "facebook/bart-large-cnn",
-  "sshleifer/distilbart-cnn-12-6",
-];
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log(`Summary API called with method: ${req.method}`);
-  console.log(`Request URL: ${req.url}`);
-  console.log(`Request headers:`, req.headers);
-  
-  if (req.method !== "POST") {
-    console.log(`Method ${req.method} not allowed, returning 405`);
-    return apiResponse(res, 405, null, "Method not allowed");
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return apiResponse(res, 405, null, 'Method not allowed');
   }
 
-  const { dreamId, text } = req.body;
-  console.log(`Request body:`, { dreamId, text: text ? text.substring(0, 100) + '...' : 'undefined' });
+  const { dreamId, text } = (req.body || {}) as { dreamId?: string; text?: string };
 
   if (!dreamId || !text) {
-    console.log(`Missing required fields: dreamId=${!!dreamId}, text=${!!text}`);
-    return apiResponse(res, 400, null, "Dream ID and text are required");
+    return apiResponse(res, 400, null, 'Dream ID and text are required');
+  }
+
+  if (!process.env.HF_API_KEY) {
+    return apiResponse(res, 500, null, 'Hugging Face API key not configured');
   }
 
   try {
-    console.log(`Generating summary for dream ID: ${dreamId}`);
-    console.log(`Text to summarize: ${text.substring(0, 100)}...`);
-    
-    // Step 1: Generate AI summary
-    let generatedSummary = null;
-    
-    // Try each model for summarization
+    let generatedSummary: string | null = null;
+
     for (const model of modelsToTry) {
       try {
-        console.log(`Trying summarization with model: ${model}`);
-
         const response = await fetch(`${HF_API_BASE}/${model}`, {
-          method: "POST",
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${process.env.HF_API_KEY}`,
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             inputs: text.length > 1000 ? text.substring(0, 1000) : text,
@@ -56,68 +43,63 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         if (!response.ok) {
-          console.error(`Model ${model} failed with status: ${response.status}`);
+          // Try next model on 5xx/503, otherwise continue
           continue;
         }
 
-        const data = await response.json();
+        const data: unknown = await response.json();
         const summary =
-          Array.isArray(data) && data.length > 0 && data[0].summary_text
-            ? data[0].summary_text
+          Array.isArray(data) && data.length > 0 && (data as any)[0]?.summary_text
+            ? (data as any)[0].summary_text
             : null;
 
         if (summary) {
-          console.log(`Summary generated successfully with model ${model}`);
-          console.log(`Summary: ${summary}`);
           generatedSummary = summary;
           break;
         }
-      } catch (error) {
-        console.error(`Model ${model} threw error:`, error);
+      } catch {
+        // Try next model
         continue;
       }
     }
 
     if (!generatedSummary) {
-      console.error('All summarization models failed');
-      return apiResponse(res, 500, null, "All summarization models failed. Try again later.");
+      return apiResponse(res, 500, null, 'All summarization models failed. Try again later.');
     }
 
-    // Step 2: Save summary to database
-    console.log('Saving summary to database...');
-    
-    try {
-      // Import supabase dynamically to avoid SSR issues
-      const { supabase } = await import('../../src/lib/supabase');
-      
-      const { data: updatedDream, error: updateError } = await supabase
-        .from('dreams')
-        .update({ summary: generatedSummary })
-        .eq('id', dreamId)
-        .select()
-        .single();
-
-      if (updateError) {
-        console.error('Database update error:', updateError);
-        return apiResponse(res, 500, null, 'Failed to save summary to database');
-      }
-
-      console.log('Summary saved to database successfully');
-      console.log('Updated dream:', updatedDream);
-
-      return apiResponse(res, 200, {
-        success: true,
-        summary: generatedSummary,
-        dreamId
-      });
-
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      return apiResponse(res, 500, null, 'Database error: ' + (dbError instanceof Error ? dbError.message : 'Unknown error'));
+    // Use authenticated Supabase client from middleware
+    const { supabase, user } = req;
+    if (!supabase || !user?.id) {
+      return apiResponse(res, 401, null, 'Unauthorized');
     }
 
+    // Update the dream summary for this user
+    const { data: updatedDream, error: updateError } = await supabase
+      .from('dreams')
+      .update({ summary: generatedSummary })
+      .eq('id', dreamId)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return apiResponse(res, 500, null, 'Failed to save summary to database');
+    }
+
+    return apiResponse(res, 200, {
+      success: true,
+      summary: generatedSummary,
+      dreamId,
+      dream: updatedDream,
+    });
   } catch (error) {
-    console.error('Error in summary endpoint:', error);
-    return apiResponse(res, 500, null, 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    return apiResponse(
+      res,
+      500,
+      null,
+      'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error'),
+    );
   }
-} 
+}
+
+export default withAuth(handler);

@@ -37,6 +37,11 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next",
+    "dist",
+    "src/lib/supabase.ts",
+    "**/*.backup",
+    "**/*.backup.*"
   ]
 }
