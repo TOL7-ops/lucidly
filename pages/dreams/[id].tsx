@@ -15,10 +15,10 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 import { Dream, extractTitle, getMoodFromSentiment } from '@/lib/api';
-import { useDream, useDeleteDream } from '@/hooks/useDreams';
+import { useDream, useDeleteDream, useUpdateDream } from '@/hooks/useDreams';
 import { resolvePublicUrlForAudioPath } from '@/lib/uploadAudio';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Download, Calendar as CalendarIcon, Headphones, Smile, Trash, Moon } from 'lucide-react';
+import { ArrowLeft, Download, Calendar as CalendarIcon, Headphones, Smile, Trash, Moon, Brain, Loader2 } from 'lucide-react';
 
 const formatDate = (iso?: string) => {
   if (!iso) return '';
@@ -65,12 +65,14 @@ const buildTxtExport = (dream: Dream, resolvedAudioUrl?: string) => {
 export default function DreamDetailsPage() {
   const router = useRouter();
   const id = typeof router.query.id === 'string' ? router.query.id : '';
-  const { dream, isLoading, isError, error } = useDream(id);
+  const { dream, isLoading, isError, error, refetch } = useDream(id);
 
   const deleteDreamMutation = useDeleteDream();
+  const updateDreamMutation = useUpdateDream();
   const { toast } = useToast();
  
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -126,6 +128,31 @@ export default function DreamDetailsPage() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const onGenerateAI = async () => {
+    if (!dream) return;
+    try {
+      setGenerating(true);
+      await updateDreamMutation.mutateAsync({
+        id: dream.id,
+        updates: { generateSummary: true, generateInterpretation: true },
+      });
+      await refetch();
+      toast({
+        title: 'AI Updated',
+        description: 'Summary and interpretation generated.',
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to generate AI analysis. Please try again.';
+      toast({
+        title: 'Error',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const onDeleteConfirmed = async () => {
@@ -201,6 +228,24 @@ export default function DreamDetailsPage() {
               Back
             </Button>
 
+            <Button
+              variant="cosmic"
+              onClick={onGenerateAI}
+              disabled={generating || updateDreamMutation.isPending}
+            >
+              {generating || updateDreamMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating
+                </>
+              ) : (
+                <>
+                  <Brain className="w-4 h-4" />
+                  Generate AI Summary
+                </>
+              )}
+            </Button>
+ 
             <Button variant="cosmic" onClick={onExportTxt}>
               <Download className="w-4 h-4" />
               Export
@@ -307,6 +352,32 @@ export default function DreamDetailsPage() {
                 </div>
               </>
             )}
+
+            {/* Summary Section */}
+            <>
+              <hr className="border-glass-border/30" />
+              <div className="border border-glass-border/30 rounded-lg p-4 bg-glass-bg/20">
+                <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+                  🧠 Summary
+                </h3>
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {dream.summary || 'No summary generated yet. Use "Generate AI Summary" to create one.'}
+                </p>
+              </div>
+            </>
+
+            {/* Interpretation Section */}
+            <>
+              <hr className="border-glass-border/30" />
+              <div className="border border-glass-border/30 rounded-lg p-4 bg-glass-bg/20">
+                <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+                  ✨ Interpretation
+                </h3>
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {dream.interpretation || 'No interpretation generated yet.'}
+                </p>
+              </div>
+            </>
 
             {/* Tags Section */}
             {Array.isArray(dream.tags) && dream.tags.length > 0 && (

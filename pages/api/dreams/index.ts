@@ -2,6 +2,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 import { withAuth, type AuthenticatedRequest, apiResponse } from '../../../src/lib/auth';
+import { summarizeAndInterpretDream, splitSummaryInterpretation } from '../../../lib/ai';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { method } = req;
@@ -84,7 +85,7 @@ async function handleCreateDream(
   userId: string,
 ) {
   try {
-    // Log the body keys to aid debugging when creation fails
+    // Diagnostic: log incoming payload shape
     try {
       const bodyKeys = Object.keys((req as any)?.body || {});
       console.log('[dreams][POST] Incoming body keys:', bodyKeys);
@@ -134,32 +135,89 @@ async function handleCreateDream(
       userId,
     });
 
-    const { data: dream, error } = await supabase
-      .from('dreams')
-      .insert({
-        title: title || null,
-        tags: Array.isArray(tags) ? tags : null,
-        content: content || '',
-        transcript: transcript || null,
-        audio_url: finalAudioUrl,
-        audio_path: finalAudioPath,
-        user_id: userId,
-      })
-      .select()
-      .single();
+    // Generate local AI summary + interpretation BEFORE inserting (single pass)
+    const dreamText = (content || transcript || '').trim();
+    let combined: string | null = null;
+    let generatedSummary: string | null = null;
+    let generatedInterpretation: string | null = null;
 
-    if (error) {
-      console.error('[dreams][POST] Insert error:', error);
+    if (dreamText) {
+      try {
+        combined = await summarizeAndInterpretDream(dreamText);
+        const parsed = splitSummaryInterpretation(combined || '');
+        generatedSummary = parsed.summary ?? null;
+        generatedInterpretation = parsed.interpretation ?? null;
+        console.log('[dreams][POST] Local combined output lengths:', {
+          summary: generatedSummary?.length || 0,
+          interpretation: generatedInterpretation?.length || 0,
+        });
+      } catch (e) {
+        console.warn('[dreams][POST] summarizeAndInterpretDream failed:', e);
+      }
+    } else {
+      console.log('[dreams][POST] No dream text available for local AI generation');
+    }
+
+    // Prepare base insert (without summary/interpretation; added conditionally)
+    const baseInsert = {
+      title: title || null,
+      tags: Array.isArray(tags) ? tags : null,
+      content: content || '',
+      transcript: transcript || null,
+      audio_url: finalAudioUrl,
+      audio_path: finalAudioPath,
+      user_id: userId,
+    } as any;
+
+    // Try insert including summary_interpretation if the column exists; fallback if not
+    let createdDreamResult = null as any;
+    let insertError: any = null;
+
+    try {
+      const { data, error } = await supabase
+        .from('dreams')
+        .insert({ ...baseInsert, summary_interpretation: combined ?? null })
+        .select()
+        .single();
+      createdDreamResult = data;
+      insertError = error;
+      if (error) throw error;
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('summary_interpretation') || msg.toLowerCase().includes('column')) {
+        console.warn('[dreams][POST] summary_interpretation column missing, retrying without it');
+        const { data, error } = await supabase
+          .from('dreams')
+          .insert({
+            ...baseInsert,
+            summary: generatedSummary ?? null,
+            interpretation: generatedInterpretation ?? null
+          })
+          .select()
+          .single();
+        createdDreamResult = data;
+        insertError = error;
+      } else {
+        insertError = err;
+      }
+    }
+
+    if (insertError) {
+      console.error('[dreams][POST] Insert error:', insertError);
       return apiResponse(
         res,
         500,
         null,
-        error?.message || 'Failed to create dream'
+        insertError?.message || 'Failed to create dream'
       );
     }
 
-    console.log('[dreams][POST] Dream created with id:', dream?.id);
-    return apiResponse(res, 201, dream);
+    const createdDream = createdDreamResult;
+
+    // (insertError already handled above)
+
+    console.log('[dreams][POST] Dream created with id:', createdDream?.id);
+    return apiResponse(res, 201, createdDream);
   } catch (error) {
     console.error('[dreams][POST] Unexpected error:', error);
     return apiResponse(

@@ -5,21 +5,29 @@ import { LandingPage } from '@/components/LandingPage';
 import { Dashboard } from '@/components/Dashboard';
 import { NewDreamForm } from '@/components/NewDreamForm';
 import { useAuth } from '@/lib/auth-context';
+import { Settings } from '@/components/Settings';
 
 type ViewType = 'landing' | 'dashboard' | 'new-dream' | 'settings';
 
 const Index = () => {
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
-  const [currentView, setCurrentView] = useState<ViewType>('landing');
+  const [currentView, setCurrentView] = useState<ViewType>(() => (typeof window !== 'undefined' && window.location.pathname === '/app' ? 'dashboard' : 'landing'));
   const [isPremium, setIsPremium] = useState(false);
 
-  // Redirect to login if not authenticated and trying to access protected routes
-  useEffect(() => {
-    if (!loading && !isAuthenticated && (currentView === 'dashboard' || currentView === 'new-dream')) {
-      router.push('/login');
-    }
-  }, [isAuthenticated, loading, currentView, router]);
+    // Redirect to login if not authenticated and trying to access protected routes
+    useEffect(() => {
+      if (!loading && !isAuthenticated && (currentView === 'dashboard' || currentView === 'new-dream')) {
+        router.push('/login');
+      }
+    }, [isAuthenticated, loading, currentView, router]);
+  
+    // Ensure /app route opens the Dashboard view (not Landing)
+    useEffect(() => {
+      if (!loading && router.pathname === '/app') {
+        setCurrentView(isAuthenticated ? 'dashboard' : 'landing');
+      }
+    }, [router.pathname, isAuthenticated, loading]);
 
   const handleGetStarted = () => {
     if (!isAuthenticated) {
@@ -91,14 +99,10 @@ const Index = () => {
           />
         );
       case 'settings':
-        return (
-          <div className="min-h-screen pt-20 flex items-center justify-center">
-            <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold text-cosmic">Settings</h1>
-              <p className="text-muted-foreground">Coming soon...</p>
-            </div>
-          </div>
-        );
+        if (!isAuthenticated) {
+          return <LandingPage onGetStarted={handleGetStarted} />;
+        }
+        return <Settings />;
       default:
         return <LandingPage onGetStarted={handleGetStarted} />;
     }

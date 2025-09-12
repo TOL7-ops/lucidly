@@ -1,7 +1,8 @@
 import { NextApiResponse } from 'next';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { withAuth, AuthenticatedRequest, apiResponse } from '../../../src/lib/auth';
-import { summarizeText, analyzeSentiment, interpretDream } from '../../../src/lib/huggingface';
+import { summarizeAndInterpretDream, splitSummaryInterpretation } from '../../../lib/ai';
+import { analyzeSentiment } from '../../../src/lib/huggingface';
 import type { Dream } from '../../../src/lib/supabaseClient';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -40,6 +41,7 @@ async function handleGetDream(
       .from('dreams')
       .select('*')
       .eq('id', dreamId)
+      .eq('user_id', user.id)
       .single();
 
     if (error) {
@@ -73,6 +75,7 @@ async function handlePutDream(
       .from('dreams')
       .update({ summary })
       .eq('id', dreamId)
+      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -103,6 +106,7 @@ async function handleUpdateDream(
       .from('dreams')
       .select('*')
       .eq('id', dreamId)
+      .eq('user_id', user.id)
       .single();
 
     if (fetchError) {
@@ -117,17 +121,26 @@ async function handleUpdateDream(
       return apiResponse(res, 400, null, 'No content available for processing');
     }
 
-    // Generate summary if requested
-    if (generateSummary && !currentDream.summary) {
+    // Combined local generation when either summary or interpretation is requested
+    if (generateSummary || generateInterpretation) {
       try {
-        updates.summary = await summarizeText(dreamText);
+        const combined = await summarizeAndInterpretDream(dreamText);
+        const parsed = splitSummaryInterpretation(combined || '');
+        if (generateSummary) {
+          updates.summary = parsed.summary ?? null;
+        }
+        if (generateInterpretation) {
+          updates.interpretation = parsed.interpretation ?? null;
+        }
+        // Attempt to store combined field if column exists
+        (updates as any).summary_interpretation = combined || null;
       } catch (error) {
-        console.error('Summary generation failed:', error);
+        console.error('AI generation failed:', error);
       }
     }
-
-    // Generate sentiment analysis if requested
-    if (generateSentiment && !currentDream.sentiment) {
+ 
+    // Generate sentiment analysis if requested (always regenerate when requested)
+    if (generateSentiment) {
       try {
         updates.sentiment = await analyzeSentiment(dreamText);
       } catch (error) {
@@ -135,29 +148,44 @@ async function handleUpdateDream(
       }
     }
 
-    // Generate interpretation if requested
-    if (generateInterpretation && !currentDream.interpretation) {
-      try {
-        updates.interpretation = await interpretDream(dreamText);
-      } catch (error) {
-        console.error('Dream interpretation failed:', error);
-      }
-    }
-
     // Update the dream if we have any updates
     if (Object.keys(updates).length > 0) {
-      const { data: updatedDream, error: updateError } = await supabase
-        .from('dreams')
-        .update(updates)
-        .eq('id', dreamId)
-        .select()
-        .single();
-
-      if (updateError) {
-        console.error('Update error:', updateError);
-        return apiResponse(res, 500, null, 'Failed to update dream');
+      // Try updating with summary_interpretation if present; fallback if column doesn't exist
+      let updatedDream: any = null;
+      try {
+        const { data, error } = await supabase
+          .from('dreams')
+          .update(updates as any)
+          .eq('id', dreamId)
+          .eq('user_id', user.id)
+          .select()
+          .single();
+        if (error) throw error;
+        updatedDream = data;
+      } catch (err: any) {
+        const msg = String(err?.message || '');
+        if (msg.toLowerCase().includes('summary_interpretation') || msg.toLowerCase().includes('column')) {
+          // Retry without the combined field
+          const retryPayload = { ...updates } as any;
+          delete (retryPayload as any).summary_interpretation;
+          const { data, error } = await supabase
+            .from('dreams')
+            .update(retryPayload)
+            .eq('id', dreamId)
+            .eq('user_id', user.id)
+            .select()
+            .single();
+          if (error) {
+            console.error('Update error:', error);
+            return apiResponse(res, 500, null, 'Failed to update dream');
+          }
+          updatedDream = data;
+        } else {
+          console.error('Update error:', err);
+          return apiResponse(res, 500, null, 'Failed to update dream');
+        }
       }
-
+ 
       return apiResponse(res, 200, updatedDream);
     }
 
@@ -179,7 +207,8 @@ async function handleDeleteDream(
     const { error } = await supabase
       .from('dreams')
       .delete()
-      .eq('id', dreamId);
+      .eq('id', dreamId)
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('Database error:', error);

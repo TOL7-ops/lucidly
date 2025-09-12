@@ -3,8 +3,6 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/app": "pages/app.js",
-  "/login": "pages/login.js",
-  "/api/dreams/[id]": "pages/api/dreams/[id].js",
-  "/api/dreams": "pages/api/dreams.js",
-  "/dreams/[id]": "pages/dreams/[id].js"
+  "/dreams/[id]": "pages/dreams/[id].js",
+  "/api/dreams/[id]": "pages/api/dreams/[id].js"
 }

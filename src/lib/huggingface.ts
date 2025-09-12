@@ -109,69 +109,71 @@ export async function interpretDream(dreamContent: string): Promise<string> {
   const HF_API_KEY = process.env.HF_API_KEY;
   if (!HF_API_KEY) throw new Error('Missing Hugging Face API key');
 
-  const modelsToTry = ['microsoft/DialoGPT-medium', 'google/flan-t5-base', 'gpt2'];
-  const dreamText = dreamContent.length > 300 ? dreamContent.substring(0, 300) : dreamContent;
+  // Lightweight, reliable default model
+  const model = 'google/flan-t5-base';
+  const dreamText = dreamContent.length > 1000 ? dreamContent.substring(0, 1000) : dreamContent;
 
-  for (const model of modelsToTry) {
-    try {
-      console.log(`Trying dream interpretation with model: ${model}`);
+  // Structured prompt per requirement
+  const prompt = `Interpret this dream in a clear and insightful way, focusing on possible symbolism and meaning: ${dreamText}`;
 
-      const prompt = model.includes('flan-t5')
-        ? `Interpret this dream: ${dreamText}`
-        : `Dream: ${dreamText}\nInterpretation: This dream suggests`;
+  try {
+    console.log(`Trying dream interpretation with model: ${model}`);
 
-      const response = await fetch(`${HF_API_BASE}/${model}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${HF_API_KEY}`,
-          'Content-Type': 'application/json',
+    const response = await fetch(`${HF_API_BASE}/${model}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${HF_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: prompt,
+        parameters: {
+          max_new_tokens: 200,
+          temperature: 0.6,
+          do_sample: true,
         },
-        body: JSON.stringify({
-          inputs: prompt,
-          parameters: {
-            max_length: 200,
-            temperature: 0.7,
-            do_sample: true,
-          },
-        }),
-      });
+      }),
+    });
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Dream interpretation result:', result);
-
-        if (result[0]?.generated_text) {
-          const interpretation = result[0].generated_text.replace(prompt, '').trim();
-          if (interpretation && interpretation.length > 10) {
-            return interpretation.length > 200
-              ? interpretation.substring(0, 200) + '...'
-              : interpretation;
-          }
-        }
-      } else {
-        console.warn(`Interpretation model ${model} failed:`, response.status, response.statusText);
-        if (response.status === 503) continue;
-      }
-    } catch (error) {
-      console.warn(`Error with interpretation model ${model}:`, error);
-      continue;
+    if (!response.ok) {
+      const errText = await response.text();
+      console.warn(`Interpretation request failed: ${response.status} ${response.statusText} - ${errText}`);
+      throw new Error(`HF interpretation failed: ${response.status}`);
     }
+
+    const result = await response.json();
+
+    // Extract generated_text across possible HF shapes
+    let generated = '';
+    if (Array.isArray(result) && result[0]?.generated_text) {
+      generated = String(result[0].generated_text);
+    } else if (typeof (result as any)?.generated_text === 'string') {
+      generated = (result as any).generated_text as string;
+    } else if (typeof result === 'string') {
+      generated = result;
+    }
+
+    // Clean up: remove prompt echo if present and normalize whitespace
+    let interpretation = generated.replace(prompt, '').trim();
+    if (!interpretation || interpretation.length < 5) {
+      interpretation = generated.trim();
+    }
+    interpretation = interpretation.replace(/^Interpretation:\s*/i, '').trim();
+
+    if (interpretation && interpretation.length > 0) {
+      return interpretation;
+    }
+
+    throw new Error('Empty interpretation from model');
+  } catch (error) {
+    console.warn('Dream interpretation error (FLAN-T5):', error);
+    // Required fallback
+    return 'This dream suggests hidden emotions and subconscious reflections.';
   }
-
-  console.log('All interpretation models failed, using detailed fallback');
-  const fallbacks = [
-    'This dream reflects your subconscious processing of recent experiences and emotions.',
-    'The imagery in this dream suggests themes of transformation and personal growth.',
-    'This dream may represent your mind working through challenges or aspirations.',
-    'The symbolism indicates a journey of self-discovery and inner reflection.',
-    'This dream could signify your unconscious desires for change or resolution.',
-  ];
-
-  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
 // ----------------- TRANSCRIPTION (Node.js version) -----------------
-export async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string> {
+export async function transcribeAudio(audioBuffer: Buffer | Uint8Array | ArrayBuffer, mimeType: string): Promise<string> {
   const HF_API_KEY = process.env.HF_API_KEY;
   if (!HF_API_KEY) throw new Error('Missing Hugging Face API key');
 
@@ -180,6 +182,9 @@ export async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Pr
     'distil-whisper/distil-large-v3.5',
     'openai/whisper-large-v3',
   ];
+
+  // Ensure compatibility with TS DOM BodyInit typing (Node fetch supports Buffer/TypedArray)
+  const requestBody: any = audioBuffer as any;
 
   for (const model of modelsToTry) {
     try {
@@ -191,7 +196,7 @@ export async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Pr
           Authorization: `Bearer ${HF_API_KEY}`,
           'Content-Type': mimeType || 'audio/wav',
         },
-        body: audioBuffer, // ✅ send Buffer directly
+        body: requestBody,
       });
 
       if (response.ok) {
