@@ -1,85 +1,165 @@
-import { pipeline, PipelineType } from '@xenova/transformers';
+// Hugging Face-powered helpers per requirement
 
-let t2t: any | null = null;
+const HF_API_BASE = 'https://api-inference.huggingface.co/models';
 
-async function getGenerator() {
-  if (!t2t) {
-    t2t = await pipeline('text2text-generation' as PipelineType, 'Xenova/distilbart-cnn-12-6');
+function getHFKey(): string {
+  const key = process.env.HF_API_KEY;
+  if (!key) {
+    throw new Error('Missing Hugging Face API key (HF_API_KEY)');
   }
-  return t2t;
+  return key;
 }
 
-function normalize(text: string): string {
-  return (text || '').replace(/\r/g, '').trim();
-}
-
-export function splitSummaryInterpretation(generated: string): { summary: string | null; interpretation: string | null } {
-  const text = normalize(generated);
-
-  // Try to extract by explicit headings
-  const summaryMatch = /summary:\s*([\s\S]*?)(?:\n{2,}|interpretation:|$)/i.exec(text);
-  const interpretationMatch = /interpretation:\s*([\s\S]*?)$/i.exec(text);
-
-  const summary = summaryMatch ? normalize(summaryMatch[1]) : null;
-  const interpretation = interpretationMatch ? normalize(interpretationMatch[1]) : null;
-
-  return { summary: summary || null, interpretation: interpretation || null };
-}
-
-/**
- * Runs a single small, fast text2text model with an instruction prompt.
- * Returns a single string that already includes both labeled sections:
- *
- * Summary:
- * ...
- *
- * Interpretation:
- * ...
- */
-export async function summarizeAndInterpretDream(dreamText: string): Promise<string> {
-  const generator = await getGenerator();
-
-  const content = (dreamText || '').trim();
-  const truncated = content.length > 3000 ? content.slice(0, 3000) : content;
-
-  const prompt =
-    `You are an expert dream analyst and summarizer.\n` +
-    `First, write a concise summary (2-4 sentences).\n` +
-    `Then, write an insightful interpretation (2-4 sentences) focusing on symbolism and meaning.\n\n` +
-    `Return the result exactly in this format:\n` +
-    `Summary:\n` +
-    `<summary text>\n\n` +
-    `Interpretation:\n` +
-    `<interpretation text>\n\n` +
-    `Dream:\n${truncated}`;
-
-  const out = await generator(prompt, {
-    max_new_tokens: 256,
-    temperature: 0.7,
-    // top_k/top_p can be added if needed
+async function hfFetchJSON(model: string, payload: any): Promise<Response> {
+  return fetch(`${HF_API_BASE}/${model}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${getHFKey()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
   });
+}
 
-  let generated = '';
-  if (Array.isArray(out) && out.length > 0) {
-    if (typeof out[0]?.generated_text === 'string') {
-      generated = out[0].generated_text;
-    } else if (typeof out[0] === 'string') {
-      generated = out[0];
+// Summarization fallback text (exact as specified)
+const FALLBACK_SUMMARY_TEXT =
+  'Summary unavailable. This dream may reflect hidden thoughts or unresolved emotions.';
+
+// Interpretation fallback text (exact as specified)
+const FALLBACK_INTERPRETATION_TEXT =
+  'This dream may symbolize transitions or hidden aspects of the self.\n' +
+  '- Unfamiliar paths could reflect uncertainty about the future.\n' +
+  '- Water often represents emotions, suggesting deep feelings beneath the surface.\n' +
+  '- A guiding animal may represent intuition leading you forward.\n' +
+  '- The glowing gate may symbolize an opportunity or transformation waiting to be embraced.';
+
+// Try the required summarization models in order and return summary_text when available
+export async function summarizeDream(dreamText: string): Promise<string> {
+  const text = (dreamText || '').trim();
+  if (!text) return FALLBACK_SUMMARY_TEXT;
+
+  const truncated = text.length > 1500 ? text.slice(0, 1500) : text;
+
+  const models = [
+    'facebook/bart-large-cnn',
+    'sshleifer/distilbart-cnn-12-6',
+    'google/pegasus-xsum',
+  ];
+
+  for (const model of models) {
+    try {
+      console.log(`[ai] summarization trying model: ${model}`);
+      const response = await hfFetchJSON(model, {
+        inputs: truncated,
+        parameters: {
+          max_length: 180,
+          min_length: 30,
+          temperature: 0.0,
+          do_sample: false,
+        },
+        options: { wait_for_model: true },
+      });
+
+      if (!response.ok) {
+        const status = response.status;
+        const txt = await response.text().catch(() => '');
+        console.warn(`[ai] summarization ${model} failed: ${status} ${txt}`);
+        // 503 means model loading; try next model
+        if (status === 503) continue;
+        continue;
+      }
+
+      const result = await response.json();
+
+      // Prefer summary_text when present
+      let summary = '';
+      if (Array.isArray(result) && result[0]?.summary_text) {
+        summary = String(result[0].summary_text);
+      } else if (Array.isArray(result) && result[0]?.generated_text) {
+        summary = String(result[0].generated_text);
+      } else if (typeof result?.summary_text === 'string') {
+        summary = String(result.summary_text);
+      } else if (typeof result?.generated_text === 'string') {
+        summary = String(result.generated_text);
+      }
+
+      summary = (summary || '').trim();
+      if (summary) {
+        return summary;
+      }
+    } catch (err) {
+      console.warn(`[ai] summarization error with ${model}:`, err);
+      continue;
     }
-  } else if (typeof (out as any)?.generated_text === 'string') {
-    generated = (out as any).generated_text;
-  } else if (typeof out === 'string') {
-    generated = out;
   }
 
-  generated = normalize(generated);
-  if (!generated.toLowerCase().includes('summary:') || !generated.toLowerCase().includes('interpretation:')) {
-    // If the model did not follow the format strictly, try to coerce
-    const { summary, interpretation } = splitSummaryInterpretation(generated);
-    const safeSummary = summary || (truncated.length > 200 ? truncated.slice(0, 197) + '...' : truncated) || 'No summary available.';
-    const safeInterpretation = interpretation || 'This dream may reflect hidden emotions and subconscious reflections.';
-    return `Summary:\n${safeSummary}\n\nInterpretation:\n${safeInterpretation}`;
+  console.log('[ai] all summarization models failed, returning fallback summary');
+  return FALLBACK_SUMMARY_TEXT;
+}
+
+// Try the required interpretation models in order with the specified prompt
+export async function interpretDream(dreamText: string): Promise<string> {
+  const text = (dreamText || '').trim();
+  if (!text) return FALLBACK_INTERPRETATION_TEXT;
+
+  const truncated = text.length > 1500 ? text.slice(0, 1500) : text;
+  const prompt = `Please interpret this dream in a meaningful, symbolic way: "${truncated}"`;
+
+  const models = [
+    'google/flan-t5-large',
+    'google/flan-t5-base',
+    'tiiuae/falcon-7b-instruct',
+  ];
+
+  for (const model of models) {
+    try {
+      console.log(`[ai] interpretation trying model: ${model}`);
+      const response = await hfFetchJSON(model, {
+        inputs: prompt,
+        parameters: {
+          max_new_tokens: 220,
+          temperature: 0.6,
+          top_p: 0.9,
+          do_sample: true,
+        },
+        options: { wait_for_model: true },
+      });
+
+      if (!response.ok) {
+        const status = response.status;
+        const txt = await response.text().catch(() => '');
+        console.warn(`[ai] interpretation ${model} failed: ${status} ${txt}`);
+        if (status === 503) continue;
+        continue;
+      }
+
+      const result = await response.json();
+
+      let generated = '';
+      if (Array.isArray(result) && result[0]?.generated_text) {
+        generated = String(result[0].generated_text);
+      } else if (typeof (result as any)?.generated_text === 'string') {
+        generated = String((result as any).generated_text);
+      } else if (Array.isArray(result) && result[0]?.summary_text) {
+        // Some models might return summary_text. Use it if present.
+        generated = String(result[0].summary_text);
+      } else if (typeof result === 'string') {
+        generated = result;
+      }
+
+      let interpretation = (generated || '').replace(prompt, '').trim();
+      if (!interpretation) interpretation = (generated || '').trim();
+      interpretation = interpretation.replace(/^interpretation:\s*/i, '').trim();
+
+      if (interpretation) {
+        return interpretation;
+      }
+    } catch (err) {
+      console.warn(`[ai] interpretation error with ${model}:`, err);
+      continue;
+    }
   }
 
-  return generated;
+  console.log('[ai] all interpretation models failed, returning fallback interpretation');
+  return FALLBACK_INTERPRETATION_TEXT;
 }

@@ -2,7 +2,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 import { withAuth, type AuthenticatedRequest, apiResponse } from '../../../src/lib/auth';
-import { summarizeAndInterpretDream, splitSummaryInterpretation } from '../../../lib/ai';
+import { summarizeDream, interpretDream } from '../../../lib/ai';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { method } = req;
@@ -135,27 +135,40 @@ async function handleCreateDream(
       userId,
     });
 
-    // Generate local AI summary + interpretation BEFORE inserting (single pass)
+    // Generate HF summary + interpretation BEFORE inserting
     const dreamText = (content || transcript || '').trim();
-    let combined: string | null = null;
     let generatedSummary: string | null = null;
     let generatedInterpretation: string | null = null;
 
+    // Manual fallbacks per requirement
+    const FALLBACK_SUMMARY_TEXT =
+      'Summary unavailable. This dream may reflect hidden thoughts or unresolved emotions.';
+    const FALLBACK_INTERPRETATION_TEXT =
+      'This dream may symbolize transitions or hidden aspects of the self.\n' +
+      '- Unfamiliar paths could reflect uncertainty about the future.\n' +
+      '- Water often represents emotions, suggesting deep feelings beneath the surface.\n' +
+      '- A guiding animal may represent intuition leading you forward.\n' +
+      '- The glowing gate may symbolize an opportunity or transformation waiting to be embraced.';
+
     if (dreamText) {
       try {
-        combined = await summarizeAndInterpretDream(dreamText);
-        const parsed = splitSummaryInterpretation(combined || '');
-        generatedSummary = parsed.summary ?? null;
-        generatedInterpretation = parsed.interpretation ?? null;
-        console.log('[dreams][POST] Local combined output lengths:', {
-          summary: generatedSummary?.length || 0,
-          interpretation: generatedInterpretation?.length || 0,
-        });
+        generatedSummary = await summarizeDream(dreamText);
       } catch (e) {
-        console.warn('[dreams][POST] summarizeAndInterpretDream failed:', e);
+        console.warn('[dreams][POST] summarizeDream failed, using fallback:', e);
+        generatedSummary = FALLBACK_SUMMARY_TEXT;
       }
+      try {
+        generatedInterpretation = await interpretDream(dreamText);
+      } catch (e) {
+        console.warn('[dreams][POST] interpretDream failed, using fallback:', e);
+        generatedInterpretation = FALLBACK_INTERPRETATION_TEXT;
+      }
+      console.log('[dreams][POST] HF output lengths:', {
+        summary: generatedSummary?.length || 0,
+        interpretation: generatedInterpretation?.length || 0,
+      });
     } else {
-      console.log('[dreams][POST] No dream text available for local AI generation');
+      console.log('[dreams][POST] No dream text available for AI generation');
     }
 
     // Prepare base insert (without summary/interpretation; added conditionally)
@@ -169,36 +182,40 @@ async function handleCreateDream(
       user_id: userId,
     } as any;
 
-    // Try insert including summary_interpretation if the column exists; fallback if not
+    // Try insert with description/summary/interpretation; gracefully fall back if columns are missing
     let createdDreamResult = null as any;
     let insertError: any = null;
 
-    try {
-      const { data, error } = await supabase
-        .from('dreams')
-        .insert({ ...baseInsert, summary_interpretation: combined ?? null })
-        .select()
-        .single();
-      createdDreamResult = data;
-      insertError = error;
-      if (error) throw error;
-    } catch (err: any) {
-      const msg = String(err?.message || '');
-      if (msg.toLowerCase().includes('summary_interpretation') || msg.toLowerCase().includes('column')) {
-        console.warn('[dreams][POST] summary_interpretation column missing, retrying without it');
+    const fullPayload: any = {
+      ...baseInsert,
+      description: dreamText || null,
+      summary: generatedSummary ?? null,
+      interpretation: generatedInterpretation ?? null,
+    };
+
+    const attempts: any[] = [
+      fullPayload, // with description + AI fields
+      { ...baseInsert, summary: generatedSummary ?? null, interpretation: generatedInterpretation ?? null }, // without description
+      { ...baseInsert, description: dreamText || null }, // without AI fields
+      { ...baseInsert }, // minimal
+    ];
+
+    for (const payload of attempts) {
+      try {
         const { data, error } = await supabase
           .from('dreams')
-          .insert({
-            ...baseInsert,
-            summary: generatedSummary ?? null,
-            interpretation: generatedInterpretation ?? null
-          })
+          .insert(payload)
           .select()
           .single();
+        if (error) throw error;
         createdDreamResult = data;
-        insertError = error;
-      } else {
+        insertError = null;
+        break;
+      } catch (err: any) {
         insertError = err;
+        const msg = String(err?.message || '');
+        console.warn('[dreams][POST] insert attempt failed:', msg);
+        // Continue to next attempt
       }
     }
 

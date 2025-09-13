@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Moon, Sun, Home, Book, Plus, Settings, Search, User, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
+import { useRouter } from 'next/router';
 
 interface NavigationProps {
   currentView: string;
@@ -12,6 +13,7 @@ interface NavigationProps {
 export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
   const [isDark, setIsDark] = useState(true);
   const { isAuthenticated, user, signOut } = useAuth();
+  const router = useRouter();
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -100,7 +102,15 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChang
                 <Button
                   variant="cosmic"
                   size="sm"
-                  onClick={() => onViewChange('login')}
+                  onClick={() => {
+                    // Always navigate to /login for unauthenticated users.
+                    // Optional polish: if already authenticated, send to dashboard (/app).
+                    if (isAuthenticated) {
+                      router.push('/app');
+                    } else {
+                      router.push('/login');
+                    }
+                  }}
                   className="flex items-center space-x-1"
                 >
                   <User className="w-4 h-4" />

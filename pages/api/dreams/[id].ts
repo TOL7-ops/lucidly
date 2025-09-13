@@ -1,7 +1,7 @@
 import { NextApiResponse } from 'next';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { withAuth, AuthenticatedRequest, apiResponse } from '../../../src/lib/auth';
-import { summarizeAndInterpretDream, splitSummaryInterpretation } from '../../../lib/ai';
+import { summarizeDream, interpretDream } from '../../../lib/ai';
 import { analyzeSentiment } from '../../../src/lib/huggingface';
 import type { Dream } from '../../../src/lib/supabaseClient';
 
@@ -121,21 +121,31 @@ async function handleUpdateDream(
       return apiResponse(res, 400, null, 'No content available for processing');
     }
 
-    // Combined local generation when either summary or interpretation is requested
-    if (generateSummary || generateInterpretation) {
+    // Manual fallbacks per requirement (used if HF or key fails)
+    const FALLBACK_SUMMARY_TEXT =
+      'Summary unavailable. This dream may reflect hidden thoughts or unresolved emotions.';
+    const FALLBACK_INTERPRETATION_TEXT =
+      'This dream may symbolize transitions or hidden aspects of the self.\n' +
+      '- Unfamiliar paths could reflect uncertainty about the future.\n' +
+      '- Water often represents emotions, suggesting deep feelings beneath the surface.\n' +
+      '- A guiding animal may represent intuition leading you forward.\n' +
+      '- The glowing gate may symbolize an opportunity or transformation waiting to be embraced.';
+
+    // Generate HF summary and/or interpretation as requested
+    if (generateSummary) {
       try {
-        const combined = await summarizeAndInterpretDream(dreamText);
-        const parsed = splitSummaryInterpretation(combined || '');
-        if (generateSummary) {
-          updates.summary = parsed.summary ?? null;
-        }
-        if (generateInterpretation) {
-          updates.interpretation = parsed.interpretation ?? null;
-        }
-        // Attempt to store combined field if column exists
-        (updates as any).summary_interpretation = combined || null;
-      } catch (error) {
-        console.error('AI generation failed:', error);
+        updates.summary = await summarizeDream(dreamText);
+      } catch (e) {
+        console.warn('[dreams][PATCH] summarizeDream failed, using fallback:', e);
+        updates.summary = FALLBACK_SUMMARY_TEXT;
+      }
+    }
+    if (generateInterpretation) {
+      try {
+        updates.interpretation = await interpretDream(dreamText);
+      } catch (e) {
+        console.warn('[dreams][PATCH] interpretDream failed, using fallback:', e);
+        updates.interpretation = FALLBACK_INTERPRETATION_TEXT;
       }
     }
  

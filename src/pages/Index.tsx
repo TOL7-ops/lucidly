@@ -12,7 +12,13 @@ type ViewType = 'landing' | 'dashboard' | 'new-dream' | 'settings';
 const Index = () => {
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
-  const [currentView, setCurrentView] = useState<ViewType>(() => (typeof window !== 'undefined' && window.location.pathname === '/app' ? 'dashboard' : 'landing'));
+  const [currentView, setCurrentView] = useState<ViewType>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname;
+      if (p === '/app' || p === '/dream-dashboard') return 'dashboard';
+    }
+    return 'landing';
+  });
   const [isPremium, setIsPremium] = useState(false);
 
     // Redirect to login if not authenticated and trying to access protected routes
@@ -24,7 +30,7 @@ const Index = () => {
   
     // Ensure /app route opens the Dashboard view (not Landing)
     useEffect(() => {
-      if (!loading && router.pathname === '/app') {
+      if (!loading && (router.pathname === '/app' || router.pathname === '/dream-dashboard')) {
         setCurrentView(isAuthenticated ? 'dashboard' : 'landing');
       }
     }, [router.pathname, isAuthenticated, loading]);
